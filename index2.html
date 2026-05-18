@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<title>Оферти PDF генератор</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<link rel="manifest" href="manifest.json">
+
+<meta name="theme-color" content="#2c3e50">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body { font-family: Arial; padding:20px; background:#f5f5f5; }
+
+.row { display:flex; gap:10px; margin-bottom:10px; }
+
+select, input { padding:8px; width:100%; }
+
+.card { background:white; padding:15px; margin-top:10px; }
+
+button { padding:10px; cursor:pointer; margin-top:10px; }
+
+.total { font-size:20px; text-align:right; margin-top:20px; }
+</style>
+</head>
+
+<body>
+
+<h2>Генератор на оферти (PDF)</h2>
+
+<div style="margin-top:15px;">
+    <label><b>Клиент:</b></label>
+    <input type="text" id="clientName" placeholder="Име на клиента" style="width:100%; padding:8px; margin-bottom:8px;">
+
+    <label><b>Адрес:</b></label>
+    <input type="text" id="clientAddress" placeholder="Адрес на обекта" style="width:100%; padding:8px;">
+</div>
+
+<div class="card">
+
+<div class="row">
+<select id="category" onchange="loadSub()"></select>
+<select id="sub"></select>
+<input type="number" id="qty" placeholder="Количество">
+<button onclick="add()">Добави</button>
+</div>
+
+</div>
+
+<div id="list"></div>
+
+<div class="total">
+Общо: <span id="total">0</span> лв
+</div>
+
+<div style="margin-top:15px;">
+    <label><b>Забележка:</b></label>
+    <textarea id="note" rows="3" style="width:100%; padding:8px;" 
+    placeholder="Въведи допълнителни условия, срокове, материали..."></textarea>
+</div>
+
+<button onclick="generatePDF()">📄 Генерирай PDF</button>
+
+
+<script>
+let prices = {};
+let items = [];
+
+fetch('prices.json')
+.then(r => r.json())
+.then(data => {
+    prices = data;
+    loadCategories();
+});
+
+function loadCategories() {
+    let cat = document.getElementById("category");
+    cat.innerHTML = "";
+
+    Object.keys(prices).forEach(c => {
+        let opt = document.createElement("option");
+        opt.value = c;
+        opt.innerText = c;
+        cat.appendChild(opt);
+    });
+
+    loadSub();
+}
+
+function loadSub() {
+    let cat = document.getElementById("category").value;
+    let sub = document.getElementById("sub");
+
+    sub.innerHTML = "";
+
+    Object.keys(prices[cat]).forEach(s => {
+        let opt = document.createElement("option");
+        opt.value = s;
+        opt.innerText = s + " (" + prices[cat][s] + " лв)";
+        sub.appendChild(opt);
+    });
+}
+
+function add() {
+    let cat = document.getElementById("category").value;
+    let sub = document.getElementById("sub").value;
+    let qty = parseFloat(document.getElementById("qty").value || 0);
+
+    let price = prices[cat][sub];
+
+    items.push({
+        cat, sub, qty, price,
+        total: qty * price
+    });
+
+    render();
+}
+
+function render() {
+    let list = document.getElementById("list");
+    list.innerHTML = "";
+
+    let total = 0;
+
+    items.forEach(i => {
+        total += i.total;
+
+        list.innerHTML += `
+        <div class="card">
+            ${i.cat} → ${i.sub} | ${i.qty} × ${i.price} = ${i.total} лв
+        </div>`;
+    });
+
+    document.getElementById("total").innerText = total;
+}
+async function generatePDF() {
+     let clientName = document.getElementById("clientName").value || "Няма въведено име";
+   let clientAddress = document.getElementById("clientAddress").value || "Няма адрес";
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+      
+
+    // 🔤 Font
+    const fontUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/fonts/Roboto/Roboto-Regular.ttf";
+    const fontBuffer = await fetch(fontUrl).then(res => res.arrayBuffer());
+    const fontBase64 = arrayBufferToBase64(fontBuffer);
+
+    doc.addFileToVFS("Roboto.ttf", fontBase64);
+    doc.addFont("Roboto.ttf", "Roboto", "normal");
+    doc.setFont("Roboto");
+
+    let y = 15;
+    let total = 0;
+
+    const today = new Date();
+    const dateStr = today.toLocaleDateString("bg-BG");
+    const offerNumber = "OF-" + today.getFullYear() + "-" + Math.floor(Math.random() * 10000);
+
+//   doc.setFontSize(14);
+doc.text('ТА ЕНД КО "ЕООД"', pageWidth / 2, y, { align: "center" });
+
+y += 12;
+
+// 👤 КЛИЕНТ БЛОК (по-ясен и отделен)
+doc.setFontSize(11);
+doc.text("Клиент:", 10, y);
+doc.text(clientName, 40, y);
+y += 7;
+
+doc.text("Адрес:", 10, y);
+doc.text(clientAddress, 40, y);
+y += 10;
+
+// линия
+doc.line(10, y, pageWidth - 10, y);
+y += 10;
+
+// 📄 ОФЕРТА ДАННИ
+doc.setFontSize(10);
+doc.text(`Оферта №: ${offerNumber}`, 10, y);
+doc.text(`Дата: ${dateStr}`, pageWidth - 10, y, { align: "right" });
+
+y += 10;
+
+// линия
+doc.line(10, y, pageWidth - 10, y);
+y += 10;
+    // 📊 table
+    doc.setFontSize(10);
+
+    // items.forEach(i => {
+    //     let lineTotal = i.qty * i.price;
+    //     total += lineTotal;
+
+    //     doc.text(`${i.cat} - ${i.sub}`, 10, y);
+    //     doc.text(String(i.qty), 90, y);
+    //     doc.text(i.price.toFixed(2), 130, y);
+    //     doc.text(lineTotal.toFixed(2), 165, y);
+
+    //     y += 8;
+
+    //     if (y > 260) {
+    //         doc.addPage();
+    //         y = 20;
+    //     }
+    // });
+    let grouped = {};
+let categoryTotals = {};
+
+// 📦 групиране
+items.forEach(i => {
+    if (!grouped[i.cat]) grouped[i.cat] = [];
+    grouped[i.cat].push(i);
+
+    if (!categoryTotals[i.cat]) categoryTotals[i.cat] = 0;
+    categoryTotals[i.cat] += i.qty * i.price;
+});
+
+// 📊 печат
+doc.setFontSize(12);
+
+Object.keys(grouped).forEach(cat => {
+
+    // 🟦 Категория (Баня, ЕЛ, ВИК)
+    doc.setFont(undefined, "bold");
+    doc.text(cat, 10, y);
+
+    y += 6;
+
+    doc.setFont(undefined, "normal");
+
+    grouped[cat].forEach(i => {
+
+        let lineTotal = i.qty * i.price;
+        total += lineTotal;
+
+        // • подкатегория
+        doc.text(`   • ${i.sub}`, 12, y);
+
+        doc.text(String(i.qty), 90, y);
+        doc.text(i.price.toFixed(2), 130, y);
+        doc.text(lineTotal.toFixed(2), 165, y);
+
+        y += 6;
+
+        if (y > 260) {
+            doc.addPage();
+            y = 20;
+        }
+    });
+
+    // 💰 междинна сума за категория
+    doc.setFont(undefined, "bold");
+    doc.text(`Общо за ${cat}: ${categoryTotals[cat].toFixed(2)} лв`, 12, y);
+
+    doc.setFont(undefined, "normal");
+
+    y += 10;
+
+    // линия между секции
+    doc.line(10, y, pageWidth - 10, y);
+    y += 8;
+});
+
+    y += 5;
+    doc.line(10, y, pageWidth - 10, y);
+    y += 10;
+
+    doc.setFontSize(14);
+    doc.text("ОБЩА СУМА:", 130, y);
+    doc.text(total.toFixed(2) + " лв", 165, y);
+
+    y += 15;
+
+    // 📝 ЗАБЕЛЕЖКА (ОТ INPUT)
+    let note = document.getElementById("note").value;
+
+    if (note && note.trim() !== "") {
+        doc.setFontSize(11);
+        doc.text("Забележка:", 10, y);
+        y += 6;
+
+        doc.setFontSize(10);
+
+        // автоматично пренасяне на редове
+        let splitNote = doc.splitTextToSize(note, pageWidth - 20);
+        doc.text(splitNote, 10, y);
+
+        y += splitNote.length * 6;
+    }
+
+    y += 10;
+
+    doc.setFontSize(9);
+    doc.text("Офертата е валидна 7 дни.", 10, y);
+
+    doc.save(`${offerNumber}.pdf`);
+}
+function arrayBufferToBase64(buffer) {
+    let binary = '';
+    let bytes = new Uint8Array(buffer);
+    let len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return window.btoa(binary);
+}
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log("SW registered"))
+    .catch(err => console.log(err));
+}
+</script>
+
+</body>
+</html>
