@@ -282,17 +282,57 @@ body {
 
 <button onclick="generatePDF()">📄 Генерирай PDF</button>
 <button onclick="newOffer()">➕ Нова оферта</button>
+<button onclick="saveOffer()">💾 Запази оферта</button>
+<h3>📚 История</h3>
+<div id="history"></div>
 
 <script>
     let prices = {};
 let items = [];
 
+// fetch('./prices.json')
+// .then(r => r.json())
+// .then(data => {
+//     prices = data;
+//     loadCategories();
+// });
+   function loadSavedData() {
+
+    const saved =
+        localStorage.getItem("crm_offer");
+
+    if (!saved) return;
+
+    const data = JSON.parse(saved);
+
+    items = data.items || [];
+
+    document.getElementById("clientName").value =
+        data.clientName || "";
+
+    document.getElementById("clientAddress").value =
+        data.clientAddress || "";
+
+    document.getElementById("note").value =
+        data.note || "";
+
+    render();
+}
 fetch('./prices.json')
 .then(r => r.json())
 .then(data => {
+
     prices = data;
+
     loadCategories();
+
+    loadSavedData();
+
+    renderHistory();
+
 });
+
+
 
 
 
@@ -677,8 +717,131 @@ function generatePDF() {
 
     document.getElementById("total").innerText = "0";
 }
+       
+function saveOffer() {
 
+    if (items.length === 0) {
+        alert("Няма артикули");
+        return;
+    }
 
+    let history =
+        JSON.parse(localStorage.getItem("crm_history")) || [];
+
+    const offer = {
+
+        id: Date.now(),
+
+        date: new Date().toLocaleString("bg-BG"),
+
+        clientName:
+            document.getElementById("clientName").value || "-",
+
+        clientAddress:
+            document.getElementById("clientAddress").value || "-",
+
+        note:
+            document.getElementById("note").value || "",
+
+        items: [...items]
+    };
+
+    history.unshift(offer);
+
+    localStorage.setItem(
+        "crm_history",
+        JSON.stringify(history)
+    );
+
+    renderHistory();
+
+    alert("Офертата е запазена");
+}
+function renderHistory() {
+
+    let history =
+        JSON.parse(localStorage.getItem("crm_history")) || [];
+
+    let box = document.getElementById("history");
+
+    box.innerHTML = "";
+
+    history.forEach(o => {
+
+        box.innerHTML += `
+
+        <div class="card">
+
+            <div class="card-content">
+
+                <b>${o.clientName}</b><br>
+
+                ${o.date}<br>
+
+                ${o.items.length} артикула
+
+            </div>
+
+            <div style="display:flex;gap:5px;">
+
+                <button onclick="loadOffer(${o.id})">
+                📂
+                </button>
+
+                <button onclick="deleteOffer(${o.id})"
+                class="delete-btn">
+                🗑
+                </button>
+
+            </div>
+
+        </div>
+        `;
+    });
+}
+
+function loadOffer(id) {
+
+    let history =
+        JSON.parse(localStorage.getItem("crm_history")) || [];
+
+    let offer =
+        history.find(o => o.id === id);
+
+    if (!offer) return;
+
+    items = offer.items;
+
+    document.getElementById("clientName").value =
+        offer.clientName;
+
+    document.getElementById("clientAddress").value =
+        offer.clientAddress;
+
+    document.getElementById("note").value =
+        offer.note;
+
+    render();
+
+    saveData();
+}
+function deleteOffer(id) {
+
+    if (!confirm("Изтриване?")) return;
+
+    let history =
+        JSON.parse(localStorage.getItem("crm_history")) || [];
+
+    history =
+        history.filter(o => o.id !== id);
+
+    localStorage.setItem(
+        "crm_history",
+        JSON.stringify(history)
+    );
+
+    renderHistory();
+}
 
     function getColor(cat) {
         switch(cat.toLowerCase()) {
