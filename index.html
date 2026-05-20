@@ -281,6 +281,7 @@ body {
 </div>
 
 <button onclick="generatePDF()">📄 Генерирай PDF</button>
+<button onclick="newOffer()">➕ Нова оферта</button>
 
 <script>
     let prices = {};
@@ -649,9 +650,35 @@ function generatePDF() {
     }
 }).download(offerNumber + ".pdf");
 }
-    
 
-// 
+   
+    function newOffer() {
+
+    if (!confirm("Сигурен ли си, че искаш нова оферта?")) return;
+
+    items = [];
+    render();
+
+    document.getElementById("clientName").value = "";
+    document.getElementById("clientAddress").value = "";
+    document.getElementById("note").value = "";
+
+    qty = 1;
+
+    let qtyEl = document.getElementById("qty");
+
+    if (qtyEl) {
+        if (qtyEl.tagName !== "INPUT" && qtyEl.tagName !== "SELECT") {
+            qtyEl.innerText = qty;
+        } else {
+            qtyEl.value = qty;
+        }
+    }
+
+    document.getElementById("total").innerText = "0";
+}
+
+
 
     function getColor(cat) {
         switch(cat.toLowerCase()) {
